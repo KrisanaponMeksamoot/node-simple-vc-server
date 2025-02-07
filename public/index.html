@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Streamer</title>
+    <script src="script.js" defer></script>
+</head>
+<body>
+    <h1>Audio Streamer</h1>
+    <button id="startButton">Start Streaming</button>
+    <button id="stopButton" disabled>Stop Streaming</button>
+    <input id="autoconnect" type="checkbox" value="Auto Connect" name="autoconnect">
+    <label for="autoconnect">Auto Connect</label>
+
+    <!-- <button onclick="refreshClients();">refresh clients</button> -->
+
+    <div id="status"></div>
+    <table class="clientlist">
+        <thead>
+            <th>UUID</th>
+            <th>IP</th>
+            <th>Control</th>
+            <th>Audio</th>
+        </thead>
+        <tbody></tbody>
+    </table>
+    <textarea id="log"></textarea>
+    <style>
+        table, td, th {
+            border: 1px black solid;
+        }
+    </style>
+</body>
+</html>
