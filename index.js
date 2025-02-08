@@ -7,7 +7,7 @@ const { v4 } = require("uuid");
 const EventEmitter = require('events');
 const { trimWebm, trimWebmClauster } = require('./webmfile');
 
-const PORT = 8443;
+const PORT = 443;
 
 const app = express();
 const http_options = {
@@ -19,6 +19,8 @@ const server = https.createServer(http_options, app);
 app.use(express.static(path.join(__dirname, 'public')));
 
 const wss = new WebSocket.Server({ server, path: "/ws" });
+
+const ZERO_ARRAY = new Uint8Array(0);
 
 const clients = new Map();
 
@@ -79,7 +81,7 @@ wss.on('connection', (socket, req) => {
                 chan.on("audiodata", sendBuffer);
                 chan.on("refresh-buffer", refreshBuffer);
                 let nbuf = Buffer.concat(chan.audiobuffers);
-                let res = chan.save_len?trimWebmClauster(nbuf, chan.save_len):trimWebm(nbuf);
+                let res = chan.save_len ? trimWebmClauster(nbuf, chan.save_len) : trimWebm(nbuf);
                 if (res) {
                     let { buffer, save_len } = res;
                     chan.save_len = save_len;
@@ -87,7 +89,7 @@ wss.on('connection', (socket, req) => {
                 }
                 chan.audiobuffers = [nbuf];
                 sendBuffer(nbuf);
-
+                clients.get(tuuid).send(packpack("refresh-buffer", ZERO_ARRAY));
                 console.log(`client ${uuid.toString()} subscribe ${tuuid.toString()}`);
             } break;
             case "unsubscribe": {

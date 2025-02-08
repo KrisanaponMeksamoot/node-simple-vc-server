@@ -1,4 +1,4 @@
-const socket = new WebSocket(`wss://${location.host}/ws`);
+var socket = new WebSocket(`wss://${location.host}/ws`);
 
 const startButton = document.getElementById('startButton');
 const stopButton = document.getElementById('stopButton');
@@ -33,11 +33,15 @@ socket.onerror = (error) => {
 
 startButton.onclick = async () => {
     log("loading");
-    let mp = await navigator.permissions.query({name: 'microphone'});
+    let mp = await navigator.permissions.query({ name: 'microphone' });
     if (mp.state == "denied") {
         log("no microphone permission");
     }
     let stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    startStream(stream);
+};
+
+function startStream(stream) {
     audioStream = stream;
 
     mediaRecorder = new MediaRecorder(stream, { mimeType: AUDIO_FORMAT, audioBitsPerSecond: 96000 });
@@ -51,7 +55,6 @@ startButton.onclick = async () => {
         socket.send(packpack("refresh-buffer", ZERO_ARRAY));
         log("streaming");
     }
-
     mediaRecorder.ondataavailable = async (event) => {
         socket.send(packpack("audiodata", new Uint8Array(await event.data.arrayBuffer())));
     };
@@ -59,13 +62,22 @@ startButton.onclick = async () => {
     mediaRecorder.onstop = () => {
         stream.getTracks().forEach(track => track.stop());
     };
-};
+}
 
 stopButton.onclick = () => {
     mediaRecorder.stop();
     startButton.disabled = false;
     stopButton.disabled = true;
+    // socket.send(packpack("refresh-buffer", ZERO_ARRAY));
 };
+
+async function refreshStream() {
+    if (mediaRecorder) {
+        // let stream = mediaRecorder.stream;
+        mediaRecorder.stop();
+        startStream(await navigator.mediaDevices.getUserMedia({ audio: true }));
+    }
+}
 
 socket.onclose = () => {
     console.log('WebSocket connection closed');
@@ -149,6 +161,10 @@ socket.addEventListener("message", async (ev) => {
             }
         } break;
         case "refresh-buffer":
+            if (argv.length == 0) {
+                refreshStream();
+                break;
+            }
             let tuuid = String.fromCharCode(...argv);
             if (medias.has(tuuid)) {
                 medias.get(tuuid).refreshBuffer();
@@ -174,6 +190,7 @@ function createAudioNode(uuid) {
     let aud = new Audio();
     let msrc = new MediaSource();
     let queue = [];
+    let bufhasdata = false;
 
     let med = {
         aud,
@@ -195,7 +212,10 @@ function createAudioNode(uuid) {
         },
         refreshBuffer() {
             queue = [];
+            if (!bufhasdata)
+                return;
             try {
+                bufhasdata = false;
                 this.bs.abort();
                 this.bs.remove(0, this.aud.duration);
                 // msrc.removeSourceBuffer(this.bs);
@@ -204,14 +224,14 @@ function createAudioNode(uuid) {
                 // this.bs.addEventListener("updateend", processQueue);
                 // processQueue();
             } catch (e) {
-                console.error("Failed to add SourceBuffer:", e);
+                console.error("Failed to refresh SourceBuffer:", e);
             }
         }
     };
 
     function processQueue() {
         if (med.bs && !med.bs.updating && queue.length > 0) {
-            let nbuf = new Uint8Array(queue.reduce((s, b)=>b.length+s, 0));
+            let nbuf = new Uint8Array(queue.reduce((s, b) => b.length + s, 0));
             let offset = 0;
             queue.forEach(fragment => {
                 nbuf.set(fragment, offset);
@@ -220,6 +240,7 @@ function createAudioNode(uuid) {
             queue = [];
             try {
                 med.bs.appendBuffer(nbuf);
+                bufhasdata = true;
             } catch (e) {
                 console.error("appendBuffer failed:", e);
             }
@@ -258,13 +279,14 @@ function subscribeClient(uuid) {
 
 function unsubscribeClient(uuid = "") {
     if (uuid == "") {
-        medias.get(uuid).close();
-        client_list.get(uuid).med = undefined;
-        medias.delete(uuid);
-    } else {
         [...medias.values()].forEach(obj => obj.close());
         medias.clear();
         [...client_list.values()].forEach(obj => obj.med = undefined);
+        console.log("unsubscribe all");
+    } else {
+        medias.get(uuid).close();
+        client_list.get(uuid).med = undefined;
+        medias.delete(uuid);
     }
     socket.send(packpack("unsubscribe", getBytes(uuid)));
 }
