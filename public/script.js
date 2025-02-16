@@ -41,8 +41,12 @@ startButton.onclick = async () => {
     startStream(stream);
 };
 
+/**
+ * @param {MediaStream} stream 
+ */
 function startStream(stream) {
     audioStream = stream;
+    stream.getAudioTracks().forEach(at => at.applyConstraints({ echoCancellation: true }));
 
     mediaRecorder = new MediaRecorder(stream, { mimeType: AUDIO_FORMAT, audioBitsPerSecond: 96000 });
 
@@ -266,7 +270,7 @@ function createAudioNode(uuid) {
     aud.src = URL.createObjectURL(msrc);
     aud.autoplay = true;
     aud.controls = true;
-    // aud.play();
+    aud.play();
     client_list.get(uuid).td_aud.appendChild(aud);
 }
 
@@ -309,6 +313,9 @@ function packpack(id, argv) {
     return buf;
 }
 
+/**
+ * @param {string} str
+ */
 function getBytes(str) {
     return getBytes.TEXT_ENC.encode(str);
 }
